@@ -58,11 +58,17 @@ session.close()
 def welcome():
     """List all available api routes."""
     return (f"Welcome to Surf's Up!: Hawaii Climate API<br/>"
+            f"-----------------------------------------------<br/>"
+            f"List of availible routes:<br/>"
             f"/api/v1.0/precipitation<br/>"
             f"/api/v1.0/stations<br/>"
             f"/api/v1.0/tobs<br/>"
-            f"/api/v1.0/<start><br/>"
-            f"/api/v1.0/<start>/<end><br/>"
+            f"<br/>"
+            f"Search by date (yyyy-mm-dd)<br/>"
+            f"(Available dates 2010-01-01 to 2017-08-23)<br/>"
+            f"-----------------------------------------------<br/>"
+            f"/api/v1.0/2017-07-31<br/>"
+            f"/api/v1.0/2017-07-19/2017-07-31<br/>"
     )
 
 @app.route("/api/v1.0/precipitation")
@@ -78,7 +84,7 @@ def precipitation():
                       .all())
     session.close()
 
-    # Convert into dicionarty using 'date' as the KEY an 'prcp' as VALUE
+    # Return the JSON representation of your dictionary
     precipitation_data = []
     for result in results:
         precipitation_dict = {result.date: result.prcp}
@@ -94,7 +100,7 @@ def stations():
     """Return a list of all Stations"""
     # Query all Stations
     results = session.query(Station.name).all()
-    
+
     # Convert list of tuples into normal list
     stations_id = list(np.ravel(results))
 
@@ -105,29 +111,63 @@ def tobs():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of all Temperature Data"""
+    """Return a list of all Temperature Data for most active Station"""
     # Query all Temperature Data including date, tobs, Most active station
-    results = (session.query(Measurement.date, Measurement.tobs, Measurement.station)
-                      .filter(Measurement ==
-                          Measurement.date > previous_yr)
+    results = (session.query(Measurement.date, Measurement.tobs, Measurement.station, Station.name)
+                      .filter(Measurement.station == "USC00519281")
+                      .filter(Measurement.date > previous_yr)
                       .order_by(Measurement.date)
                       .all())
     session.close()
 
-    # Convert into list
+    # Return the JSON representation of your dictionary
     temperature_data = []
     for result in results:
-        temperature_dict = {result.date: result.tobs, "Station": result.most_active}
+        temperature_dict = {result.date: result.tobs, result.station: result.name}
         temperature_data.append(temperature_dict)
 
     return jsonify(temperature_data)
 
+@app.route('/api/v1.0/<start_date>')
+def start(start_date):
+    selection = [Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
 
+    results =  (session.query(*selection)
+                       .filter(func.strftime("%Y-%m-%d", Measurement.date) >= start_date)
+                       .group_by(Measurement.date)
+                       .all())
 
+    #Return the JSON representation of your dictionary
+    dates = []                       
+    for result in results:
+        date_dict = {}
+        date_dict["Date"] = result[0]
+        date_dict["Low  Temperature"] = result[1]
+        date_dict["Avg. Temperature"] = result[2]
+        date_dict["High Temperature"] = result[3]
+        dates.append(date_dict)
+    return jsonify(dates)
 
+@app.route('/api/v1.0/<start_date>/<end_date>')
+def date_range(start_date, end_date):
+    selection = [Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
 
+    results =  (session.query(*selection)
+                       .filter(func.strftime("%Y-%m-%d", Measurement.date) >= start_date)
+                       .filter(func.strftime("%Y-%m-%d", Measurement.date) <= end_date)
+                       .group_by(Measurement.date)
+                       .all())
 
-
+    # Return the JSON representation of your dictionary
+    dates = []                       
+    for result in results:
+        date_dict = {}
+        date_dict["Date"] = result[0]
+        date_dict["Low  Temperature"] = result[1]
+        date_dict["Avg. Temperature"] = result[2]
+        date_dict["High Temperature"] = result[3]
+        dates.append(date_dict)
+    return jsonify(dates)
 
 
 if __name__ == '__main__':
