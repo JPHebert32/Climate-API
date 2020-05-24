@@ -10,23 +10,23 @@ from flask import Flask, jsonify
 #################################################
 # Database Setup
 #################################################
-engine = create_engine("sqlite:///Resources.hawaii.sqlite",echo=False)
+engine = create_engine("sqlite:///Resources/hawaii.sqlite", connect_args={'check_same_thread': False})
+
 # reflect an existing database into a new model
 Base = automap_base()
 # reflect the tables
 Base.prepare(engine, reflect=True)
-#
-Base.classes.keys()gi
-# Save reference to the table
-Measurement = Base.classes.mearsurements
-Station = Base.classes.station
+Base.classes.keys()
+# Save references to each table
+Measurement = Base.classes.measurement
+Station = Base.classes.station 
 
+session = Session(engine)
 #################################################
 # Flask Setup Weather app
 #################################################
 app = Flask(__name__)
 # Create our session (link) from Python to the DB
-session = Session(engine)
 
 # Design a query to retrieve the last 12 months of precipitation data and plot the results
 # Calculate the date 1 year ago from the last data point in the database
@@ -57,8 +57,7 @@ session.close()
 @app.route("/")
 def welcome():
     """List all available api routes."""
-    return (f"Welcome to Surf's Up!: Hawai'i Climate API<br/>"
-            f"Available Routes:<br/>"
+    return (f"Welcome to Surf's Up!: Hawaii Climate API<br/>"
             f"/api/v1.0/precipitation<br/>"
             f"/api/v1.0/stations<br/>"
             f"/api/v1.0/tobs<br/>"
@@ -74,7 +73,7 @@ def precipitation():
     """Return a list of all Precipitation Data"""
     # Query all Precipitation Data including date, prcp,
     results = (session.query(Measurement.date, Measurement.prcp)
-                      .filter(Measurement.date > yearBefore)
+                      .filter(Measurement.date > previous_yr)
                       .order_by(Measurement.date)
                       .all())
     session.close()
@@ -82,7 +81,7 @@ def precipitation():
     # Convert into dicionarty using 'date' as the KEY an 'prcp' as VALUE
     precipitation_data = []
     for result in results:
-        precipitaion_dict = {result.date: result.prcp}
+        precipitation_dict = {result.date: result.prcp}
         precipitation_data.append(precipitation_dict)
 
     return jsonify(precipitation_data)
@@ -92,26 +91,25 @@ def stations():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of all Statstion names"""
+    """Return a list of all Stations"""
     # Query all Stations
     results = session.query(Station.name).all()
-    session.close()
-
+    
     # Convert list of tuples into normal list
-    all_stations = list(np.ravel(results))
+    stations_id = list(np.ravel(results))
 
-    return jsonify(all_stations)
-
+    return jsonify(stations_id)
 
 @app.route("/api/v1.0/tobs")
-def temperature():
+def tobs():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
     """Return a list of all Temperature Data"""
-    # Query all Temperature Data including date, tobs, station
+    # Query all Temperature Data including date, tobs, Most active station
     results = (session.query(Measurement.date, Measurement.tobs, Measurement.station)
-                      .filter(Measurement.date > yearBefore)
+                      .filter(Measurement ==
+                          Measurement.date > previous_yr)
                       .order_by(Measurement.date)
                       .all())
     session.close()
@@ -119,7 +117,7 @@ def temperature():
     # Convert into list
     temperature_data = []
     for result in results:
-        temperature_dict = {result.date: result.tobs, "Station": result.station}
+        temperature_dict = {result.date: result.tobs, "Station": result.most_active}
         temperature_data.append(temperature_dict)
 
     return jsonify(temperature_data)
