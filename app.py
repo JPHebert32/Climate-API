@@ -16,7 +16,7 @@ Base = automap_base()
 # reflect the tables
 Base.prepare(engine, reflect=True)
 #
-Base.classes.keys()
+Base.classes.keys()gi
 # Save reference to the table
 Measurement = Base.classes.mearsurements
 Station = Base.classes.station
@@ -25,9 +25,10 @@ Station = Base.classes.station
 # Flask Setup Weather app
 #################################################
 app = Flask(__name__)
+# Create our session (link) from Python to the DB
+session = Session(engine)
 
 # Design a query to retrieve the last 12 months of precipitation data and plot the results
-
 # Calculate the date 1 year ago from the last data point in the database
 current_date = (session.query(Measurement.date)
                      .order_by(Measurement.date.desc())
@@ -48,6 +49,7 @@ current_day = int(dt.datetime.strftime(current_date, '%d'))
 previous_yr = dt.date(current_yr, current_month, current_day) - dt.timedelta(days=365)
 previous_yr = dt.datetime.strftime(previous_yr, '%Y-%m-%d')
 
+session.close()
 #################################################
 # Flask Routes
 #################################################
