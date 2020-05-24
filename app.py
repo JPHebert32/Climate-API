@@ -113,9 +113,11 @@ def tobs():
 
     """Return a list of all Temperature Data for most active Station"""
     # Query all Temperature Data including date, tobs, Most active station
+    
     results = (session.query(Measurement.date, Measurement.tobs, Measurement.station, Station.name)
-                      .filter(Measurement.station == "USC00519281")
+                      .join(Measurement, Measurement.station == Station.station)
                       .filter(Measurement.date > previous_yr)
+                      .filter(Measurement.station == "USC00519281")
                       .order_by(Measurement.date)
                       .all())
     session.close()
@@ -130,12 +132,18 @@ def tobs():
 
 @app.route('/api/v1.0/<start_date>')
 def start(start_date):
+     # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    # Query Temperature Data minimum temperature, the average temperature, and the max temperature
+    # for a given start or start-end range.
     selection = [Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
 
     results =  (session.query(*selection)
                        .filter(func.strftime("%Y-%m-%d", Measurement.date) >= start_date)
                        .group_by(Measurement.date)
                        .all())
+    session.close()
 
     #Return the JSON representation of your dictionary
     dates = []                       
@@ -150,6 +158,11 @@ def start(start_date):
 
 @app.route('/api/v1.0/<start_date>/<end_date>')
 def date_range(start_date, end_date):
+     # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    # Query Temperature Data minimum temperature, the average temperature, and the max temperature
+    # for a given start or start-end range.
     selection = [Measurement.date, func.min(Measurement.tobs), func.avg(Measurement.tobs), func.max(Measurement.tobs)]
 
     results =  (session.query(*selection)
