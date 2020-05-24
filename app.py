@@ -1,32 +1,52 @@
 import numpy as np
-
+import pandas as pd
+import datetime as dt
 import sqlalchemy
 from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine, func
-
 from flask import Flask, jsonify
-
 
 #################################################
 # Database Setup
 #################################################
-engine = create_engine("sqlite:///Resources.hawaii.sqlite")
-
+engine = create_engine("sqlite:///Resources.hawaii.sqlite",echo=False)
 # reflect an existing database into a new model
 Base = automap_base()
 # reflect the tables
 Base.prepare(engine, reflect=True)
-
+#
+Base.classes.keys()
 # Save reference to the table
 Measurement = Base.classes.mearsurements
 Station = Base.classes.station
 
 #################################################
-# Flask Setup
+# Flask Setup Weather app
 #################################################
 app = Flask(__name__)
 
+# Design a query to retrieve the last 12 months of precipitation data and plot the results
+
+# Calculate the date 1 year ago from the last data point in the database
+current_date = (session.query(Measurement.date)
+                     .order_by(Measurement.date.desc())
+                     .first())
+
+#extract string from query object
+current_date = list(np.ravel(current_date))[0]
+
+#convert date string to datetime object
+current_date = dt.datetime.strptime(current_date, '%Y-%m-%d')
+
+#extract year, month, and day as integers
+current_yr = int(dt.datetime.strftime(current_date, '%Y'))
+current_month = int(dt.datetime.strftime(current_date, '%m'))
+current_day = int(dt.datetime.strftime(current_date, '%d'))
+
+#calculate one year before latest date
+previous_yr = dt.date(current_yr, current_month, current_day) - dt.timedelta(days=365)
+previous_yr = dt.datetime.strftime(previous_yr, '%Y-%m-%d')
 
 #################################################
 # Flask Routes
@@ -35,51 +55,79 @@ app = Flask(__name__)
 @app.route("/")
 def welcome():
     """List all available api routes."""
-    return (
-        f"Available Routes:<br/>"
-        f"/api/v1.0/names<br/>"
-        f"/api/v1.0/passengers"
+    return (f"Welcome to Surf's Up!: Hawai'i Climate API<br/>"
+            f"Available Routes:<br/>"
+            f"/api/v1.0/precipitation<br/>"
+            f"/api/v1.0/stations<br/>"
+            f"/api/v1.0/tobs<br/>"
+            f"/api/v1.0/<start><br/>"
+            f"/api/v1.0/<start>/<end><br/>"
     )
 
-
-@app.route("/api/v1.0/names")
-def names():
+@app.route("/api/v1.0/precipitation")
+def precipitation():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of all passenger names"""
-    # Query all passengers
-    results = session.query(Passenger.name).all()
+    """Return a list of all Precipitation Data"""
+    # Query all Precipitation Data including date, prcp,
+    results = (session.query(Measurement.date, Measurement.prcp)
+                      .filter(Measurement.date > yearBefore)
+                      .order_by(Measurement.date)
+                      .all())
+    session.close()
 
+    # Convert into dicionarty using 'date' as the KEY an 'prcp' as VALUE
+    precipitation_data = []
+    for result in results:
+        precipitaion_dict = {result.date: result.prcp}
+        precipitation_data.append(precipitation_dict)
+
+    return jsonify(precipitation_data)
+
+@app.route("/api/v1.0/stations")
+def stations():
+    # Create our session (link) from Python to the DB
+    session = Session(engine)
+
+    """Return a list of all Statstion names"""
+    # Query all Stations
+    results = session.query(Station.name).all()
     session.close()
 
     # Convert list of tuples into normal list
-    all_names = list(np.ravel(results))
+    all_stations = list(np.ravel(results))
 
-    return jsonify(all_names)
+    return jsonify(all_stations)
 
 
-@app.route("/api/v1.0/passengers")
-def passengers():
+@app.route("/api/v1.0/tobs")
+def temperature():
     # Create our session (link) from Python to the DB
     session = Session(engine)
 
-    """Return a list of passenger data including the name, age, and sex of each passenger"""
-    # Query all passengers
-    results = session.query(Passenger.name, Passenger.age, Passenger.sex).all()
-
+    """Return a list of all Temperature Data"""
+    # Query all Temperature Data including date, tobs, station
+    results = (session.query(Measurement.date, Measurement.tobs, Measurement.station)
+                      .filter(Measurement.date > yearBefore)
+                      .order_by(Measurement.date)
+                      .all())
     session.close()
 
-    # Create a dictionary from the row data and append to a list of all_passengers
-    all_passengers = []
-    for name, age, sex in results:
-        passenger_dict = {}
-        passenger_dict["name"] = name
-        passenger_dict["age"] = age
-        passenger_dict["sex"] = sex
-        all_passengers.append(passenger_dict)
+    # Convert into list
+    temperature_data = []
+    for result in results:
+        temperature_dict = {result.date: result.tobs, "Station": result.station}
+        temperature_data.append(temperature_dict)
 
-    return jsonify(all_passengers)
+    return jsonify(temperature_data)
+
+
+
+
+
+
+
 
 
 if __name__ == '__main__':
