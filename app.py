@@ -21,13 +21,12 @@ Base.classes.keys()
 Measurement = Base.classes.measurement
 Station = Base.classes.station 
 
-session = Session(engine)
 #################################################
 # Flask Setup Weather app
 #################################################
 app = Flask(__name__)
 # Create our session (link) from Python to the DB
-
+session = Session(engine)
 # Design a query to retrieve the last 12 months of precipitation data and plot the results
 # Calculate the date 1 year ago from the last data point in the database
 current_date = (session.query(Measurement.date)
@@ -50,10 +49,10 @@ previous_yr = dt.date(current_yr, current_month, current_day) - dt.timedelta(day
 previous_yr = dt.datetime.strftime(previous_yr, '%Y-%m-%d')
 
 session.close()
+
 #################################################
 # Flask Routes
 #################################################
-
 @app.route("/")
 def welcome():
     """List all available api routes."""
